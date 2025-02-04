@@ -1,3 +1,5 @@
+import base64
+import hashlib
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify
 from cryptography.fernet import Fernet
 import os
@@ -9,38 +11,47 @@ app.secret_key = "supersecretkey"
 # Progress tracking
 progress = {"status": 0}
 
-
-# Generate a key based on a password
+# 🔹 FIX: Derive a valid 32-byte encryption key from the password
 def generate_key(password):
-    return Fernet(Fernet.generate_key())
+    password_bytes = password.encode()  
+    key = hashlib.sha256(password_bytes).digest()[:32]  # Ensure exactly 32 bytes
+    return base64.urlsafe_b64encode(key)
 
-
-# Encrypt a file
+# 🔹 FIX: Encrypt File Using the Same Key
 def encrypt_file(file_path, password):
-    fernet = generate_key(password)
+    key = generate_key(password)  
+    fernet = Fernet(key)
+
     with open(file_path, "rb") as file:
         original_data = file.read()
 
     encrypted_data = fernet.encrypt(original_data)
+
     with open(file_path, "wb") as file:
         file.write(encrypted_data)
 
-
-# Decrypt a file
+# 🔹 FIX: Decrypt File Using the Same Key (with Debugging)
 def decrypt_file(file_path, password):
-    fernet = generate_key(password)
+    key = generate_key(password)  
+    fernet = Fernet(key)
+
+    print(f"🔑 Decryption Key: {key}")  # Debugging: Print the key
+
     with open(file_path, "rb") as file:
         encrypted_data = file.read()
 
-    decrypted_data = fernet.decrypt(encrypted_data)
+    try:
+        decrypted_data = fernet.decrypt(encrypted_data)
+    except Exception as e:
+        print(f"❌ Decryption failed: {e}")  # Debugging: Show error details
+        raise
+
     with open(file_path, "wb") as file:
         file.write(decrypted_data)
-
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     return render_template("index.html")
-
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -60,20 +71,26 @@ def upload():
         time.sleep(0.01)
         progress["status"] = i
 
-    if action == "encrypt":
-        encrypt_file(file_path, password)
-        flash("File encrypted successfully!", "success")
-    elif action == "decrypt":
-        decrypt_file(file_path, password)
-        flash("File decrypted successfully!", "success")
+    try:
+        if action == "encrypt":
+            encrypt_file(file_path, password)
+            flash("File encrypted successfully!", "success")
+        elif action == "decrypt":
+            try:
+                decrypt_file(file_path, password)
+                flash("File decrypted successfully!", "success")
+            except Exception as e:
+                flash(f"Decryption failed: {str(e)}", "danger")
+                return redirect(url_for("index"))
 
-    return send_file(file_path, as_attachment=True)
-
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+        return redirect(url_for("index"))
 
 @app.route("/progress", methods=["GET"])
 def get_progress():
     return jsonify(progress)
-
 
 if __name__ == "__main__":
     os.makedirs("uploads", exist_ok=True)
