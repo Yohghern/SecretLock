@@ -8,16 +8,16 @@ import time
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
-# Progress tracking
+
 progress = {"status": 0}
 
-# 🔹 FIX: Derive a valid 32-byte encryption key from the password
+
 def generate_key(password):
     password_bytes = password.encode()  
-    key = hashlib.sha256(password_bytes).digest()[:32]  # Ensure exactly 32 bytes
+    key = hashlib.sha256(password_bytes).digest()[:32]  
     return base64.urlsafe_b64encode(key)
 
-# 🔹 FIX: Encrypt File Using the Same Key
+
 def encrypt_file(file_path, password):
     key = generate_key(password)  
     fernet = Fernet(key)
@@ -30,12 +30,12 @@ def encrypt_file(file_path, password):
     with open(file_path, "wb") as file:
         file.write(encrypted_data)
 
-# 🔹 FIX: Decrypt File Using the Same Key (with Debugging)
+
 def decrypt_file(file_path, password):
     key = generate_key(password)  
     fernet = Fernet(key)
 
-    print(f"🔑 Decryption Key: {key}")  # Debugging: Print the key
+    print(f"🔑 Decryption Key: {key}")  
 
     with open(file_path, "rb") as file:
         encrypted_data = file.read()
@@ -43,7 +43,7 @@ def decrypt_file(file_path, password):
     try:
         decrypted_data = fernet.decrypt(encrypted_data)
     except Exception as e:
-        print(f"❌ Decryption failed: {e}")  # Debugging: Show error details
+        print(f"❌ Decryption failed: {e}")  
         raise
 
     with open(file_path, "wb") as file:
